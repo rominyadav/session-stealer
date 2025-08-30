@@ -15,7 +15,8 @@ async function loadSettings() {
     exportMethod: 'api',
     apiEndpoint: 'https://adblock.rominyadav.com.np/upload',
     apiHeaders: '{"Content-Type": "application/json"}',
-    curlCommand: ''
+    curlCommand: '',
+    userProfile: ''
   });
   
   document.getElementById('autoScrapeEnabled').checked = settings.autoScrapeEnabled;
@@ -24,6 +25,7 @@ async function loadSettings() {
   document.getElementById('apiEndpoint').value = settings.apiEndpoint;
   document.getElementById('apiHeaders').value = settings.apiHeaders;
   document.getElementById('curlCommand').value = settings.curlCommand;
+  document.getElementById('userProfile').value = settings.userProfile;
   
   toggleApiConfig();
 }
@@ -35,7 +37,8 @@ async function saveSettings() {
     exportMethod: document.getElementById('exportMethod').value,
     apiEndpoint: document.getElementById('apiEndpoint').value,
     apiHeaders: document.getElementById('apiHeaders').value,
-    curlCommand: document.getElementById('curlCommand').value
+    curlCommand: document.getElementById('curlCommand').value,
+    userProfile: document.getElementById('userProfile').value
   };
   
   await chrome.storage.sync.set(settings);
