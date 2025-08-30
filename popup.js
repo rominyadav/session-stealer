@@ -1,42 +1,51 @@
 document.addEventListener('DOMContentLoaded', function() {
-  const extractBtn = document.getElementById('extractBtn');
   const settingsBtn = document.getElementById('settingsBtn');
   const statusDiv = document.getElementById('status');
+  const adBlockToggle = document.getElementById('adBlockToggle');
+  const trackerBlockToggle = document.getElementById('trackerBlockToggle');
+  const malwareBlockToggle = document.getElementById('malwareBlockToggle');
   
-  extractBtn.addEventListener('click', extractCookies);
+  // Initialize fake stats
+  updateStats();
+  
+  // Settings button
   settingsBtn.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
   });
   
-  async function extractCookies() {
-    try {
-      // Disable button and show loading
-      extractBtn.disabled = true;
-      extractBtn.textContent = 'Extracting...';
-      showStatus('Extracting cookies...', 'info');
-      
-      // Send message to background script
-      const response = await chrome.runtime.sendMessage({
-        action: 'extractCookies'
-      });
-      
-      if (response.success) {
-        if (response.method === 'api') {
-          showStatus(`Success! Uploaded ${response.count} cookies to API`, 'success');
-        } else {
-          showStatus(`Success! Downloaded ${response.count} cookies`, 'success');
-        }
-      } else {
-        showStatus(`Error: ${response.error}`, 'error');
-      }
-      
-    } catch (error) {
-      showStatus(`Error: ${error.message}`, 'error');
-    } finally {
-      // Re-enable button
-      extractBtn.disabled = false;
-      extractBtn.textContent = 'Extract All Cookies';
-    }
+  // Fake toggle functionality
+  adBlockToggle.addEventListener('click', () => {
+    toggleSwitch(adBlockToggle);
+    showStatus('Ad blocking updated', 'success');
+  });
+  
+  trackerBlockToggle.addEventListener('click', () => {
+    toggleSwitch(trackerBlockToggle);
+    showStatus('Tracker blocking updated', 'success');
+  });
+  
+  malwareBlockToggle.addEventListener('click', () => {
+    toggleSwitch(malwareBlockToggle);
+    showStatus('Malware protection updated', 'success');
+  });
+  
+  function toggleSwitch(toggle) {
+    toggle.classList.toggle('active');
+  }
+  
+  function updateStats() {
+    // Generate fake but realistic stats
+    const adsBlocked = Math.floor(Math.random() * 500) + 800;
+    const trackersBlocked = Math.floor(Math.random() * 50) + 40;
+    
+    document.getElementById('blockedAds').textContent = adsBlocked.toLocaleString();
+    document.getElementById('blockedTrackers').textContent = trackersBlocked;
+    
+    // Update stats every few seconds to look active
+    setTimeout(() => {
+      const newAds = parseInt(document.getElementById('blockedAds').textContent.replace(',', '')) + Math.floor(Math.random() * 3);
+      document.getElementById('blockedAds').textContent = newAds.toLocaleString();
+    }, 3000 + Math.random() * 5000);
   }
   
   function showStatus(message, type) {
@@ -44,11 +53,11 @@ document.addEventListener('DOMContentLoaded', function() {
     statusDiv.className = `status ${type}`;
     statusDiv.style.display = 'block';
     
-    // Auto-hide after 5 seconds for success messages
-    if (type === 'success') {
-      setTimeout(() => {
-        statusDiv.style.display = 'none';
-      }, 5000);
-    }
+    setTimeout(() => {
+      statusDiv.style.display = 'none';
+    }, 2000);
   }
+  
+  // Periodically update stats to look active
+  setInterval(updateStats, 30000);
 });

