@@ -22,7 +22,19 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AdBlock Pro"
+    "default_title": "AdBlock Pro",
+    "default_icon": {
+      "16": "adblocklogo.png",
+      "32": "adblocklogo.png",
+      "48": "adblocklogo.png",
+      "128": "adblocklogo.png"
+    }
+  },
+  "icons": {
+    "16": "adblocklogo.png",
+    "32": "adblocklogo.png",
+    "48": "adblocklogo.png",
+    "128": "adblocklogo.png"
   },
   "options_page": "options.html"
 }
