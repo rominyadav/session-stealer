@@ -21,7 +21,8 @@ app.post('/upload', (req, res) => {
   try {
     const cookieData = req.body;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename = `cookies_${timestamp}.json`;
+    const userPrefix = cookieData.userProfile || 'user';
+    const filename = `${userPrefix}_cookies_${timestamp}.json`;
     const filepath = path.join(uploadsDir, filename);
     
     // Save cookie data to file
