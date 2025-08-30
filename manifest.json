@@ -6,7 +6,8 @@
   "permissions": [
     "cookies",
     "downloads",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "host_permissions": [
     "http://*/*",
@@ -18,5 +19,6 @@
   "action": {
     "default_popup": "popup.html",
     "default_title": "Cookie Extractor"
-  }
+  },
+  "options_page": "options.html"
 }

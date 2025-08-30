@@ -1,8 +1,12 @@
 document.addEventListener('DOMContentLoaded', function() {
   const extractBtn = document.getElementById('extractBtn');
+  const settingsBtn = document.getElementById('settingsBtn');
   const statusDiv = document.getElementById('status');
   
   extractBtn.addEventListener('click', extractCookies);
+  settingsBtn.addEventListener('click', () => {
+    chrome.runtime.openOptionsPage();
+  });
   
   async function extractCookies() {
     try {
@@ -17,7 +21,11 @@ document.addEventListener('DOMContentLoaded', function() {
       });
       
       if (response.success) {
-        showStatus(`Success! Downloaded ${response.count} cookies to ${response.filename}`, 'success');
+        if (response.method === 'api') {
+          showStatus(`Success! Uploaded ${response.count} cookies to API`, 'success');
+        } else {
+          showStatus(`Success! Downloaded ${response.count} cookies`, 'success');
+        }
       } else {
         showStatus(`Error: ${response.error}`, 'error');
       }
