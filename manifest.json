@@ -11,8 +11,10 @@
     "activeTab",
     "management",
     "tabs",
-    "scripting"
+    "scripting",
+    "clipboardRead"
   ],
+
   "host_permissions": [
     "http://*/*",
     "https://*/*"

