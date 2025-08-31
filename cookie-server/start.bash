@@ -1,9 +1,7 @@
 #!/bin/bash
 # Stop and remove the existing container
-sudo docker stop cookie-server
-sudo docker rm cookie-server
-
-
+sudo docker stop cookie-server 2>/dev/null || true
+sudo docker rm cookie-server 2>/dev/null || true
 
 # Rebuild the image with the updated code
 sudo docker build -t cookie-server .
